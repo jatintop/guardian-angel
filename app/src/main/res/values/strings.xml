@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Use NoActionBar theme -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/darkBackground</item>
+        <!-- Other theme attributes -->
+    </style>
+    <string name="app_name">Guardian Angel</string>
+</resources>

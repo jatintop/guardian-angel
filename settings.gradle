@@ -1,0 +1,22 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        google()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+//    versionCatalogs {
+//        libs {
+//            from("gradle/libs.versions.toml")
+//        }
+//    }
+}
+rootProject.name = "M3-BottomNavigation"
+include ':app'
