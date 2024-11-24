@@ -1,6 +1,7 @@
 package com.plcoding.m3_bottomnavigation
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -81,6 +82,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.google.android.gms.location.LocationServices
+import com.plcoding.m3_bottomnavigation.Constants.END_NOTIFICATION_ID
 
 
 data class BottomNavigationItem(
@@ -121,17 +123,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
-            100 -> {
-                if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED)) {
-                    // Permission was granted, get the current location
-                    getCurrentLocation(this)
+            Constants.REQUEST_NOTIFICATION_PERMISSION -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // Permission granted, you can send notifications
                 } else {
-                    // Permission denied, handle this case (maybe show a message to the user)
+                    // Permission denied, show a message to the user
+                    Toast.makeText(this, "Notification permission required", Toast.LENGTH_SHORT).show()
                 }
-                return
             }
         }
     }
@@ -141,6 +143,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         createNotificationChannel(this)
         requestNotificationPermission(this)
+
         setContent {
             M3BottomNavigationTheme {
                 Surface(
@@ -240,19 +243,19 @@ class MainActivity : ComponentActivity() {
 }
 
 
-private fun createNotificationChannel(context: Context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        val name = "Timer Channel"
-        val descriptionText = "Channel for timer notifications"
-        val importance = NotificationManager.IMPORTANCE_HIGH
-        val channel = NotificationChannel("timer_channel", name, importance).apply {
-            description = descriptionText
-        }
-        val notificationManager: NotificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(channel)
-    }
-}
+//private fun createNotificationChannel(context: Context) {
+//    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//        val name = "Timer Channel"
+//        val descriptionText = "Channel for timer notifications"
+//        val importance = NotificationManager.IMPORTANCE_HIGH
+//        val channel = NotificationChannel("timer_channel", name, importance).apply {
+//            description = descriptionText
+//        }
+//        val notificationManager: NotificationManager =
+//            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+//        notificationManager.createNotificationChannel(channel)
+//    }
+//}
 
 
 
@@ -391,6 +394,19 @@ private fun checkNotificationPermission(context: Context): Boolean {
         true
     }
 }
+private fun createNotificationChannel(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val name = "Timer Channel"
+        val descriptionText = "Channel for timer notifications"
+        val importance = NotificationManager.IMPORTANCE_HIGH
+        val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+            description = descriptionText
+        }
+        val notificationManager: NotificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+    }
+}
 
 fun showTimerNotification(context: Context, durationInMillis: Long) {
     createNotificationChannel(context)
@@ -407,6 +423,8 @@ fun showTimerNotification(context: Context, durationInMillis: Long) {
 
     notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
 }
+
+
 
 // Add this new receiver class
 class DismissNotificationReceiver : BroadcastReceiver() {
@@ -459,24 +477,64 @@ fun updateNotification(context: Context, timeLeft: Long, withSound: Boolean) {
     notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
 }
 
+// Add these constants at the top of your Constants object
+object Constants {
+    const val REQUEST_NOTIFICATION_PERMISSION = 1001
+    const val NOTIFICATION_ID = 1
+    const val END_NOTIFICATION_ID = 2
+    const val CHANNEL_ID = "TimerChannel"
+    const val ACTION_YES = "com.yourdomain.app.ACTION_YES"
+    const val ACTION_NO = "com.yourdomain.app.ACTION_NO"
+}
 
 fun triggerEndNotification(context: Context) {
     createNotificationChannel(context)
 
-    if (!checkNotificationPermission(context)) return // Ensure permission is checked
+    if (!checkNotificationPermission(context)) return
 
     val notificationManager = NotificationManagerCompat.from(context)
 
-    // Build your notification as before
+    // Create PendingIntent for "Yes" action
+    val yesIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+        action = ACTION_YES
+    }
+    val yesPendingIntent = PendingIntent.getBroadcast(
+        context,
+        0,
+        yesIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // Create PendingIntent for "No" action
+    val noIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+        action = ACTION_NO
+    }
+    val noPendingIntent = PendingIntent.getBroadcast(
+        context,
+        1,
+        noIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // Build notification with actions
     val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_timer)
         .setContentTitle("Activity Ended")
         .setContentText("Are you safe?")
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setAutoCancel(true)
-    // Add actions as before
+        .addAction(R.drawable.ic_check, "Yes", yesPendingIntent)
+        .addAction(R.drawable.ic_close, "No", noPendingIntent)
+        .setOngoing(true) // Makes the notification persistent until user responds
 
-    notificationManager.notify(2, notificationBuilder.build())
+    // Use vibration pattern to get attention
+    notificationBuilder.setVibrate(longArrayOf(1000, 1000, 1000, 1000, 1000))
+
+    try {
+        notificationManager.notify(END_NOTIFICATION_ID, notificationBuilder.build())
+    } catch (e: SecurityException) {
+        Log.e("Notification", "Permission denied: ${e.message}")
+    }
 }
 
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -484,7 +542,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         try {
             // Dismiss the notification
             val notificationManager = NotificationManagerCompat.from(context)
-            notificationManager.cancel(2)
+            notificationManager.cancel(END_NOTIFICATION_ID)
 
             when (intent.action) {
                 ACTION_YES -> {
@@ -492,6 +550,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     Toast.makeText(context, "Glad you're safe!", Toast.LENGTH_SHORT).show()
                 }
                 ACTION_NO -> {
+                    // Show a toast to indicate SOS is being triggered
+                    Toast.makeText(context, "Triggering SOS...", Toast.LENGTH_SHORT).show()
                     // Trigger SOS functionality
                     triggerSOSFunctionality(context)
                 }
@@ -674,11 +734,20 @@ fun StartActivityCard() {
                     onClick = {
                         val hours = customHours.toIntOrNull() ?: 0
                         val minutes = customMinutes.toIntOrNull() ?: 0
+
                         if (hours > 0 || minutes > 0) {
                             val durationText = buildString {
-                                if (hours > 0) append("$hours hour${if (hours > 1) "s" else ""}")
-                                if (hours > 0 && minutes > 0) append(" ")
-                                if (minutes > 0) append("$minutes min${if (minutes > 1) "s" else ""}")
+                                if (hours > 0) {
+                                    append("$hours hour")
+                                    if (hours > 1) append("s")
+                                }
+                                if (hours > 0 && minutes > 0) {
+                                    append(" ")
+                                }
+                                if (minutes > 0) {
+                                    append("$minutes min")
+                                    if (minutes > 1) append("s")
+                                }
                             }
                             selectedDuration = durationText
                             showCustomDurationDialog = false

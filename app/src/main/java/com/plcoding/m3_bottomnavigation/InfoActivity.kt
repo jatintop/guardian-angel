@@ -292,7 +292,7 @@ fun AppInfoCard(
                     color = Color.White
                 )
                 Text(
-                    text = "Beta 3.0",
+                    text = "Beta 5.0",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
